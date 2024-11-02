@@ -27,6 +27,8 @@
 #include <linux/string_helpers.h>
 #include <soc/qcom/of_common.h>
 #include <soc/qcom/secure_buffer.h>
+#include <linux/msm_kgsl.h>
+#include <trace/hooks/mm.h>
 
 #include "kgsl_compat.h"
 #include "kgsl_debugfs.h"
@@ -5078,6 +5080,20 @@ int kgsl_of_property_read_ddrtype(struct device_node *node, const char *base,
 	return of_property_read_u32(node, base, ptr);
 }
 
+static void kgsl_show_mem(void *data, unsigned int filter, nodemask_t *nodemask)
+{
+	long total_kbytes = atomic_long_read(&kgsl_driver.stats.page_alloc) >> 10;
+
+	pr_info("%s: %ld kB\n", "KgslSharedmem", total_kbytes);
+}
+
+static void kgsl_meminfo(void *data, struct seq_file *m)
+{
+	long total_kbytes = atomic_long_read(&kgsl_driver.stats.page_alloc) >> 10;
+
+	show_val_meminfo(m, "KgslSharedmem", total_kbytes);
+}
+
 int kgsl_device_platform_probe(struct kgsl_device *device)
 {
 	struct platform_device *pdev = device->pdev;
@@ -5124,6 +5140,8 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	timer_setup(&device->work_period_timer, kgsl_work_period_timer, 0);
 	spin_lock_init(&device->work_period_lock);
 	INIT_WORK(&device->work_period_ws, _log_gpu_work_events);
+	register_trace_android_vh_show_mem(kgsl_show_mem, NULL);
+	register_trace_android_vh_meminfo_proc_show(kgsl_meminfo, NULL);
 
 	return 0;
 
@@ -5142,6 +5160,8 @@ error:
 void kgsl_device_platform_remove(struct kgsl_device *device)
 {
 	del_timer(&device->work_period_timer);
+	unregister_trace_android_vh_show_mem(kgsl_show_mem, NULL);
+	unregister_trace_android_vh_meminfo_proc_show(kgsl_meminfo, NULL);
 
 	if (device->events_wq) {
 		destroy_workqueue(device->events_wq);
