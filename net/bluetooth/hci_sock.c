@@ -976,7 +976,7 @@ static int hci_sock_bound_ioctl(struct sock *sk, unsigned int cmd,
 static int hci_sock_ioctl(struct socket *sock, unsigned int cmd,
 			  unsigned long arg)
 {
-    /*
+#if 0
 	void __user *argp = (void __user *)arg;
 	struct sock *sk = sock->sk;
 	int err;
@@ -1101,7 +1101,7 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd,
 done:
 	release_sock(sk);
 	return err;
-    */
+#endif
 	return 0;
 }
 
@@ -2054,11 +2054,13 @@ done:
 	return err;
 }
 
+#if 0
 static void hci_sock_destruct(struct sock *sk)
 {
 	skb_queue_purge(&sk->sk_receive_queue);
 	skb_queue_purge(&sk->sk_write_queue);
 }
+#endif
 
 static const struct proto_ops hci_sock_ops = {
 	.family		= PF_BLUETOOTH,

@@ -548,6 +548,7 @@ static void __attach_io_flag(struct f2fs_io_info *fio)
 	if ((1 << fio->temp) & fua_flag)
 		fio->op_flags |= REQ_FUA;
 
+#if 0
 	/*
 	 * P221011-01695
 	 * flush_group: Process group in which file's is very important.
@@ -560,6 +561,7 @@ static void __attach_io_flag(struct f2fs_io_info *fio)
 		if (f2fs_is_atomic_file(inode) && f2fs_is_commit_atomic_write(inode))
 			fio->op_flags |= REQ_FUA;
 	}
+#endif
 }
 
 static void __submit_merged_bio(struct f2fs_bio_info *io)

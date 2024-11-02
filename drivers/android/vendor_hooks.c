@@ -68,7 +68,6 @@
 #include <trace/hooks/fips140.h>
 #include <trace/hooks/remoteproc.h>
 #include <trace/hooks/shmem_fs.h>
-#include <trace/hooks/net.h>
 #include <trace/hooks/syscall_check.h>
 #include <trace/hooks/usb.h>
 #include <trace/hooks/ipv6.h>
@@ -325,12 +324,6 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_tcpm_get_timer);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_tcpm_adj_current_limit);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_logbuf);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_logbuf_pr_cont);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ptype_head);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_kfree_skb);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_sk_alloc);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_sk_free);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_nf_conn_alloc);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_nf_conn_free);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tune_scan_type);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tune_swappiness);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_shrink_slab_bypass);

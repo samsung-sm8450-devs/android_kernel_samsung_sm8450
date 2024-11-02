@@ -680,8 +680,10 @@ static long madvise_writeback(struct vm_area_struct *vma,
 	if (!can_madv_lru_vma(vma))
 		return 0;
 
+#if 0
 	if (!can_do_pageout(vma))
 		return 0;
+#endif
 
 	if (am_app_launch)
 		return -EBUSY;
