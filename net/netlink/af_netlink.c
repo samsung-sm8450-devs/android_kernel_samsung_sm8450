@@ -70,6 +70,8 @@
 
 #include "af_netlink.h"
 
+#include <linux/rtnetlink.h>
+
 struct listeners {
 	struct rcu_head		rcu;
 	unsigned long		masks[];
@@ -77,6 +79,14 @@ struct listeners {
 
 /* state bits */
 #define NETLINK_S_CONGESTED		0x0
+
+#define CONFIG_DEBUG_RTNL_LATENCY
+#ifdef CONFIG_DEBUG_RTNL_LATENCY
+static unsigned long time_latency;
+static char owner_comm[32];
+#endif
+
+extern struct mutex rtnl_mutex;
 
 static inline int netlink_is_kernel(struct sock *sk)
 {
@@ -2216,7 +2226,24 @@ static int netlink_dump(struct sock *sk)
 	int alloc_min_size;
 	int alloc_size;
 
+#ifdef CONFIG_DEBUG_RTNL_LATENCY
+	unsigned long local_time_latency = jiffies;
+	
 	mutex_lock(nlk->cb_mutex);
+	
+	if (sk->sk_protocol == NETLINK_ROUTE) {
+		if (time_after(jiffies, local_time_latency + 1 * HZ / 2)) {
+			pr_err("rtnl_lock: %s: %s took over 500 msec to grab local rtnl_lock!\n",
+				__func__, current->comm);
+			dump_stack();
+		}
+
+		strncpy(owner_comm, current->comm, 31);
+		time_latency = jiffies;	
+	}
+#else
+	mutex_lock(nlk->cb_mutex);
+#endif
 	if (!nlk->cb_running) {
 		err = -EINVAL;
 		goto errout_skb;
@@ -2274,6 +2301,17 @@ static int netlink_dump(struct sock *sk)
 
 	if (nlk->dump_done_errno > 0 ||
 	    skb_tailroom(skb) < nlmsg_total_size(sizeof(nlk->dump_done_errno))) {
+
+#ifdef CONFIG_DEBUG_RTNL_LATENCY
+		if (sk->sk_protocol == NETLINK_ROUTE) {
+			if (time_after(jiffies, time_latency + 1 * HZ / 2)) {
+				pr_err("rtnl_lock: %s: %s(%s) took over 500 msec to unlock\n", __func__,
+					owner_comm, current->comm);
+				dump_stack();
+			}
+			time_latency = jiffies;
+		}
+#endif
 		mutex_unlock(nlk->cb_mutex);
 
 		if (sk_filter(sk, skb))
@@ -2308,12 +2346,32 @@ static int netlink_dump(struct sock *sk)
 	WRITE_ONCE(nlk->cb_running, false);
 	module = cb->module;
 	skb = cb->skb;
+#ifdef CONFIG_DEBUG_RTNL_LATENCY
+		if (sk->sk_protocol == NETLINK_ROUTE) {
+			if (time_after(jiffies, time_latency + 1 * HZ / 2)) {
+				pr_err("rtnl_lock: %s: %s(%s) took over 500 msec to unlock\n", __func__,
+					owner_comm, current->comm);
+				dump_stack();
+			}
+			time_latency = jiffies;
+		}
+#endif
 	mutex_unlock(nlk->cb_mutex);
 	module_put(module);
 	consume_skb(skb);
 	return 0;
 
 errout_skb:
+#ifdef CONFIG_DEBUG_RTNL_LATENCY
+		if (sk->sk_protocol == NETLINK_ROUTE) {
+			if (time_after(jiffies, time_latency + 1 * HZ / 2)) {
+				pr_err("rtnl_lock: %s: %s(%s) took over 500 msec to unlock\n", __func__,
+					owner_comm, current->comm);
+				dump_stack();
+			}
+			time_latency = jiffies;
+		}
+#endif
 	mutex_unlock(nlk->cb_mutex);
 	kfree_skb(skb);
 	return err;
@@ -2327,6 +2385,9 @@ int __netlink_dump_start(struct sock *ssk, struct sk_buff *skb,
 	struct netlink_callback *cb;
 	struct sock *sk;
 	int ret;
+#ifdef CONFIG_DEBUG_RTNL_LATENCY
+	unsigned long local_time_latency = jiffies;
+#endif
 
 	refcount_inc(&skb->users);
 
@@ -2337,7 +2398,24 @@ int __netlink_dump_start(struct sock *ssk, struct sk_buff *skb,
 	}
 
 	nlk = nlk_sk(sk);
+
+#ifdef CONFIG_DEBUG_RTNL_LATENCY
 	mutex_lock(nlk->cb_mutex);
+
+	if (sk->sk_protocol == NETLINK_ROUTE) {
+		if (time_after(jiffies, local_time_latency + 1 * HZ / 2)) {
+			pr_err("rtnl_lock: %s: %s took over 500 msec to grab local rtnl_lock!\n",
+				__func__, current->comm);
+			dump_stack();
+		}
+
+		strncpy(owner_comm, current->comm, 31);
+		time_latency = jiffies;	
+	}
+#else
+	mutex_lock(nlk->cb_mutex);
+#endif	
+
 	/* A dump is in progress... */
 	if (nlk->cb_running) {
 		ret = -EBUSY;
@@ -2371,6 +2449,16 @@ int __netlink_dump_start(struct sock *ssk, struct sk_buff *skb,
 	WRITE_ONCE(nlk->cb_running, true);
 	nlk->dump_done_errno = INT_MAX;
 
+#ifdef CONFIG_DEBUG_RTNL_LATENCY
+		if (sk->sk_protocol == NETLINK_ROUTE) {
+			if (time_after(jiffies, time_latency + 1 * HZ / 2)) {
+				pr_err("rtnl_lock: %s: %s(%s) took over 500 msec to unlock\n", __func__,
+					owner_comm, current->comm);
+				dump_stack();
+			}
+			time_latency = jiffies;
+		}
+#endif
 	mutex_unlock(nlk->cb_mutex);
 
 	ret = netlink_dump(sk);
@@ -2389,6 +2477,16 @@ error_put:
 	module_put(control->module);
 error_unlock:
 	sock_put(sk);
+#ifdef CONFIG_DEBUG_RTNL_LATENCY
+		if (sk->sk_protocol == NETLINK_ROUTE) {
+			if (time_after(jiffies, time_latency + 1 * HZ / 2)) {
+				pr_err("rtnl_lock: %s: %s(%s) took over 500 msec to unlock\n", __func__,
+					owner_comm, current->comm);
+				dump_stack();
+			}
+			time_latency = jiffies;
+		}
+#endif
 	mutex_unlock(nlk->cb_mutex);
 error_free:
 	kfree_skb(skb);
